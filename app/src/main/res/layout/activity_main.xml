@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/main"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:padding="16dp"
+    tools:context=".MainActivity">
+
+    <TextView
+        android:id="@+id/statusText"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Приложение работает"
+        android:textSize="18sp"
+        android:textStyle="bold"
+        android:paddingBottom="16dp" />
+
+    <Button
+        android:id="@+id/stopServiceButton"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Прекратить слушать" />
+
+    <Button
+        android:id="@+id/startServiceButton"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Включить сервис" />
+
+    <Button
+        android:id="@+id/logsButton"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Логи"
+        android:layout_marginTop="8dp"/>
+
+    <Button
+        android:id="@+id/changeTokenButton"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Изменить токен"
+        android:layout_marginTop="8dp"/>
+    <TextView
+        android:id="@+id/permissionsStatusText"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Проверка разрешений..."
+        android:textSize="16sp"
+        android:layout_marginTop="16dp"
+        android:layout_gravity="center_horizontal"/>
+
+
+</LinearLayout>

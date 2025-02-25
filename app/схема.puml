@@ -1,0 +1,43 @@
+@startuml
+title Диаграмма работы приложения SMS Listener
+
+actor Пользователь
+participant "MainActivity" as Main
+participant "SmsReceiver (BroadcastReceiver)" as Receiver
+participant "SmsListenerService (Foreground Service)" as Service
+participant "База данных (Room)" as DB
+participant "Сервер (API)" as API
+participant "Уведомления (NotificationManager)" as Notifier
+
+== Запуск приложения ==
+Пользователь -> Main: Открывает приложение
+Main -> Main: Проверяет разрешения
+Main -> Пользователь: Запрос разрешений
+
+alt Разрешения не выданы
+    Пользователь -> Main: Отклоняет запрос
+    Main -> Main: Показывает предупреждение
+else Разрешения выданы
+    Пользователь -> Main: Подтверждает
+    Main -> Main: Запускает сервис
+    Main -> Service: Запуск SmsListenerService
+end
+
+== Перехват SMS ==
+Receiver -> Receiver: Получает SMS
+Receiver -> DB: Проверяет, есть ли сообщение в БД
+alt Сообщение уже есть
+    Receiver -> Receiver: Пропускает обработку
+else Новое сообщение
+    Receiver -> DB: Сохраняет SMS
+    Receiver -> Main: Отображает в логах
+    Receiver -> API: Отправляет SMS на сервер
+    alt Успешная отправка
+        API -> Receiver: Подтверждение
+    else Ошибка
+        API -> Receiver: Лог ошибки
+    end
+    Receiver -> Notifier: Показывает уведомление пользователю
+end
+
+@enduml
