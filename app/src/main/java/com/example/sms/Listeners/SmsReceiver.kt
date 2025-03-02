@@ -26,7 +26,10 @@ import kotlinx.coroutines.withContext
 class SmsReceiver : BroadcastReceiver() {
 
     private val channelId = "sms_notifications"
-    private val saveSmsMutex = Mutex()
+    companion object {
+        private val saveSmsMutex = Mutex()
+    }
+
 
     override fun onReceive(context: Context?, intent: Intent?) {
         context ?: return
@@ -59,7 +62,8 @@ class SmsReceiver : BroadcastReceiver() {
         val pdus = intent.extras?.get("pdus") as? Array<*> ?: return null
         val smsMessages = pdus.mapNotNull { pdu ->
             SmsMessage.createFromPdu(pdu as ByteArray)
-        }.distinctBy { it.messageBody } // Убираем дубликаты частей
+        }.distinctBy { it.timestampMillis } // Убираем дубликаты по времени
+
 
         if (smsMessages.isEmpty()) return null
 
