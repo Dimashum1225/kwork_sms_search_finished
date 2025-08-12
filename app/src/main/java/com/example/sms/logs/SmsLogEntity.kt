@@ -7,7 +7,7 @@ import androidx.room.PrimaryKey
 data class SmsLogEntity(
     @PrimaryKey(autoGenerate = true) val id: Int = 0,
     val sender: String,
-    val text: String,
+    val sms_text: String,
     val timestamp: Long
 )
 

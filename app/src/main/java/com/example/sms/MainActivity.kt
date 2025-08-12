@@ -12,6 +12,8 @@ import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import android.Manifest
 import android.app.ActivityManager
+import android.app.NotificationChannel
+import android.app.NotificationManager
 import android.content.Context
 import android.content.SharedPreferences
 import android.net.Uri
@@ -21,12 +23,17 @@ import android.widget.Button
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.app.NotificationCompat
 import androidx.lifecycle.lifecycleScope
 import com.example.sms.Listeners.SmsListenerService
 import com.example.sms.database.AuthRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import android.content.ComponentName
+import android.provider.Settings
+import com.example.sms.core.NotificationHelper
+import com.example.sms.core.PermissionManager
 
 class MainActivity : AppCompatActivity() {
     private lateinit var authRepository: AuthRepository
@@ -36,6 +43,8 @@ class MainActivity : AppCompatActivity() {
     private lateinit var logsButton: Button
     private lateinit var changeTokenButton: Button
     private lateinit var sharedPreferences: SharedPreferences
+    private lateinit var permissionManager: PermissionManager
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
@@ -47,13 +56,36 @@ class MainActivity : AppCompatActivity() {
         logsButton = findViewById(R.id.logsButton)
         changeTokenButton = findViewById(R.id.changeTokenButton)
 
-        checkAndRequestPermissions() // Запрос разрешений
-        requestIgnoreBatteryOptimizations()
+        NotificationHelper.ensureListenerEnabled(this)
 
-        // Запрашиваем разрешение на уведомления, если Android 13+
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            requestNotificationPermission()
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val channel = NotificationChannel(
+                "test",
+                "Test Channel",
+                NotificationManager.IMPORTANCE_DEFAULT
+            )
+            val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            manager.createNotificationChannel(channel)
         }
+
+
+
+        permissionManager = PermissionManager(this)
+        permissionManager.init { contract, callback ->
+            registerForActivityResult(contract, callback)
+        }
+
+        permissionManager.requestSequential(
+            Manifest.permission.RECEIVE_SMS,
+            Manifest.permission.POST_NOTIFICATIONS
+        ) {
+            updatePermissionsUI()
+        }
+
+        requestIgnoreBatteryOptimizations()
+        startActivity(Intent("android.settings.ACTION_NOTIFICATION_LISTENER_SETTINGS"))
+
 
         // Инициализация репозитория для работы с токеном
         authRepository = AuthRepository(this)
@@ -71,31 +103,29 @@ class MainActivity : AppCompatActivity() {
         sharedPreferences = getSharedPreferences("AppPrefs", Context.MODE_PRIVATE)
 
 
+
+        startServiceButton.setOnClickListener {
+            sharedPreferences.edit()
+                .putBoolean("manual_stop", false)
+                .putBoolean("shouldSendNotification", true)
+                .apply()
+
+            val flag = sharedPreferences.getBoolean("shouldSendNotification", false)
+            Log.d("PrefsCheck", "После старта: shouldSendNotification = $flag")
+
+            startSmsListenerService()
+            statusText.text = "Сервис запущен"
+        }
         stopServiceButton.setOnClickListener {
-            // Сохраняем флаг, что сервис был остановлен вручную
-            val editor = sharedPreferences.edit()
-            editor.putBoolean("manual_stop", true) // Сервис остановлен вручную
-            editor.apply()
+            sharedPreferences.edit()
+                .putBoolean("manual_stop", true)
+                .putBoolean("shouldSendNotification", false) // Выключаем отправку уведомлений
+                .apply()
 
-            // Останавливаем сервис
             stopService(Intent(this, SmsListenerService::class.java))
-
-            // Обновляем статус
             statusText.text = "Сервис остановлен вручную"
         }
 
-        startServiceButton.setOnClickListener {
-            // Сбрасываем флаг manual_stop при включении сервиса
-            val editor = sharedPreferences.edit()
-            editor.putBoolean("manual_stop", false) // Очищаем флаг
-            editor.apply()
-
-            // Запускаем сервис
-            startService(Intent(this, SmsListenerService::class.java))
-
-            // Обновляем статус
-            statusText.text = "Сервис запущен"
-        }
 
 
         logsButton.setOnClickListener {
@@ -111,47 +141,28 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun checkAndRequestPermissions() {
-        val permissionsStatus = StringBuilder("Статус разрешений:\n")
+    private fun updatePermissionsUI() {
+        val status = StringBuilder("Статус разрешений:\n")
 
-        lifecycleScope.launch {
-            if (!requestPermission(Manifest.permission.RECEIVE_SMS)) {
-                permissionsStatus.append("⛔ Нет разрешения на SMS\n")
+        if (permissionManager.isGranted(Manifest.permission.RECEIVE_SMS)) {
+            status.append("✅ Разрешение на SMS выдано\n")
+        } else {
+            status.append("⛔ Нет разрешения на SMS\n")
+        }
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (permissionManager.isGranted(Manifest.permission.POST_NOTIFICATIONS)) {
+                status.append("✅ Разрешение на уведомления выдано\n")
             } else {
-                permissionsStatus.append("✅ Разрешение на SMS выдано\n")
-            }
-
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                if (!requestPermission(Manifest.permission.POST_NOTIFICATIONS)) {
-                    permissionsStatus.append("⛔ Нет разрешения на уведомления\n")
-                } else {
-                    permissionsStatus.append("✅ Разрешение на уведомления выдано\n")
-                }
-            }
-
-            withContext(Dispatchers.Main) {
-                findViewById<TextView>(R.id.permissionsStatusText).text = permissionsStatus.toString()
+                status.append("⛔ Нет разрешения на уведомления\n")
             }
         }
+
+        findViewById<TextView>(R.id.permissionsStatusText).text = status.toString()
     }
 
 
-    private suspend fun requestPermission(permission: String): Boolean {
 
-        return withContext(Dispatchers.Main) {
-            val requestPermissionLauncher =
-                registerForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted: Boolean ->
-                    if (!isGranted) {
-                        Toast.makeText(this@MainActivity, "Разрешение $permission не предоставлено", Toast.LENGTH_SHORT).show()
-                    }
-                }
-
-            if (ContextCompat.checkSelfPermission(this@MainActivity, permission) != PackageManager.PERMISSION_GRANTED) {
-                requestPermissionLauncher.launch(permission)
-            }
-            ContextCompat.checkSelfPermission(this@MainActivity, permission) == PackageManager.PERMISSION_GRANTED
-        }
-    }
 
     private fun startSmsListenerService() {
         val serviceIntent = Intent(this, SmsListenerService::class.java)
@@ -190,16 +201,11 @@ class MainActivity : AppCompatActivity() {
     }
 
 
-    private fun requestNotificationPermission() {
-        val requestPermissionLauncher = registerForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted: Boolean ->
-            if (!isGranted) {
-                Toast.makeText(this, "Разрешение на уведомления не предоставлено", Toast.LENGTH_SHORT).show()
-            }
-        }
 
-        if (checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
-            requestPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-        }
+    override fun onResume() {
+        super.onResume()
+        updatePermissionsUI()
     }
+
 }
 

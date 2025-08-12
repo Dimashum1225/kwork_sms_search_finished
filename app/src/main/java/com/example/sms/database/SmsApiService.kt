@@ -6,6 +6,6 @@ import retrofit2.http.POST
 
 interface SmsApiService {
 
-    @POST("api/sms_receiver/")  // Убедитесь, что URL правильный
+    @POST("confirm_payment/")  // Убедитесь, что URL правильный
     suspend fun sendSms(@Body sms: SmsData): Response<Unit>
 }

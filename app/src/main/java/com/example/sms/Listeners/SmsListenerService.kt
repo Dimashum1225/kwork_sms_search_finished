@@ -17,34 +17,27 @@ class SmsListenerService : LifecycleService() {
     private val channelId = "sms_listener_service"
     private val notificationId = 1
     private lateinit var sharedPreferences: SharedPreferences
+    private lateinit var smsReceiver: SmsReceiver
 
     override fun onCreate() {
         super.onCreate()
         sharedPreferences = getSharedPreferences("AppPrefs", Context.MODE_PRIVATE)
         createNotificationChannel()
-
-        // Запуск сервиса как фоновый
         startForeground(notificationId, createNotification())
-        // Проверяем флаг, чтобы понять, перезапускаем ли мы сервис
+
         val manualStop = sharedPreferences.getBoolean("manual_stop", false)
-
-        if (!manualStop) {
-            // Если флаг не установлен, регистрируем ресивер
-            registerReceiver(SmsReceiver(), IntentFilter("android.provider.Telephony.SMS_RECEIVED"))
-        }
-        // Обновляем уведомление, что сервис начал слушать SMS
-        updateNotification(true)
-        // Проверяем флаг на перезапуск
         val shouldRestart = sharedPreferences.getBoolean("should_restart", true)
-        if (shouldRestart) {
-            // Очищаем флаг, чтобы сервис не перезапускался снова после обычного старта
-            val editor = sharedPreferences.edit()
-            editor.putBoolean("manual_stop", false) // Сброс флага
-            editor.apply()
 
-            // Регистрация для прослушивания SMS
-            registerReceiver(SmsReceiver(), IntentFilter("android.provider.Telephony.SMS_RECEIVED"))
+        if (!manualStop || shouldRestart) {
+            smsReceiver = SmsReceiver()
+            registerReceiver(smsReceiver, IntentFilter("android.provider.Telephony.SMS_RECEIVED"))
+
+            val editor = sharedPreferences.edit()
+            editor.putBoolean("manual_stop", false)
+            editor.apply()
         }
+
+        updateNotification(true)
     }
 
     private fun createNotificationChannel() {
@@ -83,17 +76,21 @@ class SmsListenerService : LifecycleService() {
 
     override fun onDestroy() {
         super.onDestroy()
+
+        try {
+            unregisterReceiver(smsReceiver)
+        } catch (e: Exception) {
+            Log.w("SmsListenerService", "Receiver already unregistered or not initialized: ${e.message}")
+        }
+
         val isManualStop = sharedPreferences.getBoolean("manual_stop", false)
         if (isManualStop) {
             Log.d("SmsListenerService", "Сервис остановлен вручную, не перезапускаем.")
         } else {
             Log.d("SmsListenerService", "Сервис остановлен, перезапускаем...")
-            // Устанавливаем флаг для перезапуска сервиса
-            val editor = sharedPreferences.edit()
-            editor.putBoolean("should_restart", true)
-            editor.apply()
 
-            // Перезапуск сервиса, если флаг не установлен
+            sharedPreferences.edit().putBoolean("should_restart", true).apply()
+
             val restartIntent = Intent(applicationContext, SmsListenerService::class.java)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 applicationContext.startForegroundService(restartIntent)
@@ -102,4 +99,5 @@ class SmsListenerService : LifecycleService() {
             }
         }
     }
+
 }

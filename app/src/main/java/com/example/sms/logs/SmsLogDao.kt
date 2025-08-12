@@ -12,8 +12,8 @@ interface SmsLogDao {
 
     @Query("SELECT * FROM sms_logs")
     suspend fun getLastLogs(): List<SmsLogEntity>
-    @Query("SELECT * FROM sms_logs WHERE sender = :sender AND text = :text LIMIT 1")
-    fun getLogBySenderAndText(sender: String, text: String): SmsLogEntity?
+    @Query("SELECT * FROM sms_logs WHERE sender = :sender AND sms_text = :sms_text LIMIT 1")
+    fun getLogBySenderAndText(sender: String, sms_text: String): SmsLogEntity?
 
 
 }

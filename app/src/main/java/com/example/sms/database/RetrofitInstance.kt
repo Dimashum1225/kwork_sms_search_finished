@@ -5,7 +5,7 @@ import retrofit2.converter.gson.GsonConverterFactory
 
 object RetrofitInstance {
 
-    private const val BASE_URL = "https://dripmoney.io/"  // Базовый URL вашего сервера
+    private const val BASE_URL = "https://flpay.tech/api/"  // Базовый URL вашего сервера
 
     val apiService: SmsApiService by lazy {
         Retrofit.Builder()

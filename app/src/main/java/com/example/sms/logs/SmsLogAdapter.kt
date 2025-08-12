@@ -17,7 +17,7 @@ class SmsLogAdapter(private var logs: List<SmsLogEntity>) : RecyclerView.Adapter
     override fun onBindViewHolder(holder: SmsLogViewHolder, position: Int) {
         val log = logs[position]
         holder.senderText.text = log.sender
-        holder.messageText.text = log.text
+        holder.messageText.text = log.sms_text
         holder.timestampText.text = log.timestamp.toString()
     }
 

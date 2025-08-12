@@ -15,6 +15,7 @@ import com.example.sms.database.AuthRepository
 import com.example.sms.database.RetrofitInstance
 import com.example.sms.database.SmsData
 import com.example.sms.logs.SmsLogEntity
+import com.google.gson.Gson
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -76,7 +77,7 @@ class SmsReceiver : BroadcastReceiver() {
     /** Проверяет, есть ли сообщение в БД, и если нет — сохраняет */
     private suspend fun processAndSaveSms(context: Context, sender: String, text: String): Boolean {
         val db = AppDatabase.getDatabase(context)
-        val log = SmsLogEntity(sender = sender, text = text, timestamp = System.currentTimeMillis())
+        val log = SmsLogEntity(sender = sender, sms_text = text, timestamp = System.currentTimeMillis())
 
         return saveSmsMutex.withLock {
             withContext(Dispatchers.IO) {
@@ -101,8 +102,10 @@ class SmsReceiver : BroadcastReceiver() {
     private suspend fun sendSmsToServer(sender: String, text: String, deviceToken: String) {
         withContext(Dispatchers.IO) {
             try {
-                val smsData = SmsData(sender = sender, text = text, device_token = deviceToken)
+                val smsData = SmsData(sms_text = text, api_key = deviceToken)
                 val response = RetrofitInstance.apiService.sendSms(smsData)
+                val json = Gson().toJson(smsData)
+                Log.d("SmsReceiver", "Отправка: $json")
 
                 if (response.isSuccessful) {
                     Log.d("SmsReceiver", "SMS успешно отправлен на сервер.")
